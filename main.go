@@ -30,25 +30,30 @@ func fmtScript(code string) string {
 	return code
 }
 
+type data struct {
+	input   string
+	code    string
+	compact bool
+}
+
 type model struct {
 	textarea textarea.Model
 	viewport viewport.Model
 
-	input string
-	code  string
+	d data
 
-	compact bool
-	err     error
-	num     int
+	err error
+	num int
 }
 
 func newModel(text string) model {
 	rt := model{
 		textarea: textarea.New(),
 		viewport: viewport.New(80, 15),
-		input:    text,
-		code:     "#placeholder",
-	}
+		d: data{
+			input: text,
+			code:  "#placeholder",
+		}}
 
 	rt.textarea.SetHeight(3)
 	rt.textarea.Placeholder = "jq..."
@@ -91,15 +96,15 @@ func (m model) Init() tea.Cmd {
 		tick(),
 	)
 }
-func (m model) query() (string, error) {
+func (d data) query() (string, error) {
 	var output bytes.Buffer
 
 	prog := jqx.Program{
-		Args:   []string{" " + m.code},
-		Stdin:  bytes.NewBufferString(m.input),
+		Args:   []string{" " + d.code},
+		Stdin:  bytes.NewBufferString(d.input),
 		Stdout: &output,
 
-		StdoutIsTerminal: !m.compact,
+		StdoutIsTerminal: !d.compact,
 	}
 	err := prog.Main()
 	rt := output.String()
@@ -112,6 +117,8 @@ func (m model) query() (string, error) {
 const Margin = 8
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	oldData := m.d
+
 	switch msg := msg.(type) {
 	case updateMsg:
 		if msg.m == nil {
@@ -133,25 +140,23 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.num++
 		return m, nil
 	case tabMsg:
-		m.code = "#placeholder"
-		m.compact = !m.compact
+		m.d.compact = !m.d.compact
 	}
 
 	var cmd tea.Cmd
 	var text string
 	m.textarea, cmd = m.textarea.Update(msg)
-	code := fmtScript(m.textarea.Value())
-	if m.code == code {
+	m.d.code = fmtScript(m.textarea.Value())
+	if m.d == oldData {
 		goto abortUpdate
 	}
 
-	m.code = code
-	text, m.err = m.query()
+	text, m.err = m.d.query()
 	if m.err != nil {
 		goto abortUpdate
 	}
 
-	cmd = tea.Batch(cmd, logScript(code))
+	cmd = tea.Batch(cmd, logScript(m.d.code))
 	m.viewport.SetContent(text)
 
 abortUpdate:
