@@ -29,23 +29,6 @@ func fmtScript(code string) string {
 	}
 	return code
 }
-func query(code, input string) (string, error) {
-	var output bytes.Buffer
-
-	prog := jqx.Program{
-		Args:   []string{" " + code},
-		Stdin:  bytes.NewBufferString(input),
-		Stdout: &output,
-
-		StdoutIsTerminal: true,
-	}
-	err := prog.Main()
-	rt := output.String()
-	if rt == "null\n" {
-		return rt, fmt.Errorf("error: query returned null")
-	}
-	return rt, err
-}
 
 type model struct {
 	textarea textarea.Model
@@ -54,8 +37,9 @@ type model struct {
 	input string
 	code  string
 
-	err error
-	num int
+	compact bool
+	err     error
+	num     int
 }
 
 func newModel(text string) model {
@@ -91,6 +75,7 @@ func logScript(code string) tea.Cmd {
 	return tea.Printf("    '%s'", code)
 }
 
+type tabMsg struct{}
 type updateMsg func(*model) tea.Cmd
 type switchMsg struct {
 	m tea.Model
@@ -103,6 +88,23 @@ func (m model) Init() tea.Cmd {
 		tick(),
 	)
 }
+func (m model) query() (string, error) {
+	var output bytes.Buffer
+
+	prog := jqx.Program{
+		Args:   []string{" " + m.code},
+		Stdin:  bytes.NewBufferString(m.input),
+		Stdout: &output,
+
+		StdoutIsTerminal: !m.compact,
+	}
+	err := prog.Main()
+	rt := output.String()
+	if rt == "null\n" {
+		return rt, fmt.Errorf("error: query returned null")
+	}
+	return rt, err
+}
 
 const Margin = 8
 
@@ -112,37 +114,41 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		width := msg.Width - Margin*2
 		m.textarea.SetWidth(width * 3 / 4)
 		m.viewport.Width = width
+		m.viewport.Height = msg.Height / 2
 		return m, nil
 	case updateMsg:
 		cmd := msg(&m)
 		return m, cmd
 	case switchMsg:
 		return msg.m, msg.c
+	case tabMsg:
+		m.code = "#placeholder"
+		m.compact = !m.compact
 	case tea.MouseMsg:
 		var cmd tea.Cmd
 		m.viewport, cmd = m.viewport.Update(msg)
 		return m, cmd
-	default:
-		var cmd tea.Cmd
-		var text string
-		m.textarea, cmd = m.textarea.Update(msg)
-		code := fmtScript(m.textarea.Value())
-		if m.code == code {
-			goto abortUpdate
-		}
-
-		m.code = code
-		text, m.err = query(code, m.input)
-		if m.err != nil {
-			goto abortUpdate
-		}
-
-		cmd = tea.Batch(cmd, logScript(code))
-		m.viewport.SetContent(text)
-
-	abortUpdate:
-		return m, cmd
 	}
+
+	var cmd tea.Cmd
+	var text string
+	m.textarea, cmd = m.textarea.Update(msg)
+	code := fmtScript(m.textarea.Value())
+	if m.code == code {
+		goto abortUpdate
+	}
+
+	m.code = code
+	text, m.err = m.query()
+	if m.err != nil {
+		goto abortUpdate
+	}
+
+	cmd = tea.Batch(cmd, logScript(code))
+	m.viewport.SetContent(text)
+
+abortUpdate:
+	return m, cmd
 }
 
 var headerStyle = lipgloss.NewStyle().
@@ -187,6 +193,8 @@ func msgFilter(_ tea.Model, msg tea.Msg) tea.Msg {
 				emptyModel{},
 				tea.Quit,
 			}
+		case tea.KeyTab:
+			return tabMsg{}
 		}
 	}
 	return msg
