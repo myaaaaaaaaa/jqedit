@@ -19,21 +19,37 @@ import (
 
 const sampleJSON = `{"a":5,"b":"c","d":["e","f"],"g":{"h":"i","j":"k"}}`
 
-var spaceRe = regexp.MustCompile(`\S+`)
-
-func fmtScript(code string) string {
-	words := spaceRe.FindAllString(code, -1)
-	code = strings.Join(words, " ")
-	if code == "" {
-		code = "."
-	}
-	return code
-}
-
 type data struct {
 	input   string
 	code    string
 	compact bool
+}
+
+func (d data) query() (string, error) {
+	var output bytes.Buffer
+
+	prog := jqx.Program{
+		Args:   []string{" " + d.code},
+		Stdin:  bytes.NewBufferString(d.input),
+		Stdout: &output,
+
+		StdoutIsTerminal: !d.compact,
+	}
+	err := prog.Main()
+	rt := output.String()
+	if rt == "null\n" {
+		return rt, fmt.Errorf("error: query returned null")
+	}
+	return rt, err
+}
+
+type (
+	tabMsg  struct{}
+	tickMsg struct{}
+)
+type updateMsg struct {
+	m tea.Model
+	c tea.Cmd
 }
 
 type model struct {
@@ -61,57 +77,11 @@ func newModel(text string) model {
 
 	return rt
 }
-func tick() tea.Cmd {
-	return tea.Tick(time.Second, func(t time.Time) tea.Msg {
-		return updateMsg{c: tea.Batch(
-			func() tea.Msg { return tickMsg{} },
-			tick(),
-		)}
-	})
-}
-
-var logged = map[string]bool{}
-
-func logScript(code string) tea.Cmd {
-	if logged[code] {
-		return nil
-	}
-	logged[code] = true
-	return tea.Printf("    '%s'", code)
-}
-
-type (
-	tabMsg  struct{}
-	tickMsg struct{}
-)
-
-type updateMsg struct {
-	m tea.Model
-	c tea.Cmd
-}
-
 func (m model) Init() tea.Cmd {
 	return tea.Batch(
 		textarea.Blink,
 		tick(),
 	)
-}
-func (d data) query() (string, error) {
-	var output bytes.Buffer
-
-	prog := jqx.Program{
-		Args:   []string{" " + d.code},
-		Stdin:  bytes.NewBufferString(d.input),
-		Stdout: &output,
-
-		StdoutIsTerminal: !d.compact,
-	}
-	err := prog.Main()
-	rt := output.String()
-	if rt == "null\n" {
-		return rt, fmt.Errorf("error: query returned null")
-	}
-	return rt, err
 }
 
 const Margin = 8
@@ -163,14 +133,16 @@ abortUpdate:
 	return m, cmd
 }
 
-var headerStyle = lipgloss.NewStyle().
-	Bold(true).
-	Foreground(lipgloss.Color("#4444cc"))
-var errorStyle = lipgloss.NewStyle().
-	Bold(true).
-	Foreground(lipgloss.Color("#880000"))
-var hrStyle = lipgloss.NewStyle().
-	Foreground(lipgloss.Color("#cccccc"))
+var (
+	headerStyle = lipgloss.NewStyle().
+			Bold(true).
+			Foreground(lipgloss.Color("#4444cc"))
+	errorStyle = lipgloss.NewStyle().
+			Bold(true).
+			Foreground(lipgloss.Color("#880000"))
+	hrStyle = lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#cccccc"))
+)
 
 func (m model) View() string {
 	viewport := m.viewport.View()
@@ -200,6 +172,51 @@ func (m model) View() string {
 		"\n" + errorStyle.Render(err)
 }
 
+type emptyModel struct{}
+
+func (_ emptyModel) Init() tea.Cmd                         { return nil }
+func (e emptyModel) Update(_ tea.Msg) (tea.Model, tea.Cmd) { return e, nil }
+func (_ emptyModel) View() string                          { return "" }
+
+////////////////////////////////////////////////////////////////////////////////
+// Helpers
+////////////////////////////////////////////////////////////////////////////////
+
+var spaceRe = regexp.MustCompile(`\S+`)
+
+func fmtScript(code string) string {
+	words := spaceRe.FindAllString(code, -1)
+	code = strings.Join(words, " ")
+	if code == "" {
+		code = "."
+	}
+	return code
+}
+func isTerminal(f fs.File) bool {
+	stat, err := f.Stat()
+	if err != nil {
+		return false
+	}
+	return stat.Mode()&fs.ModeCharDevice != 0
+}
+func tick() tea.Cmd {
+	return tea.Tick(time.Second, func(t time.Time) tea.Msg {
+		return updateMsg{c: tea.Batch(
+			func() tea.Msg { return tickMsg{} },
+			tick(),
+		)}
+	})
+}
+
+var logged = map[string]bool{}
+
+func logScript(code string) tea.Cmd {
+	if logged[code] {
+		return nil
+	}
+	logged[code] = true
+	return tea.Printf("    '%s'", code)
+}
 func msgFilter(_ tea.Model, msg tea.Msg) tea.Msg {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
@@ -214,20 +231,6 @@ func msgFilter(_ tea.Model, msg tea.Msg) tea.Msg {
 		}
 	}
 	return msg
-}
-
-type emptyModel struct{}
-
-func (_ emptyModel) Init() tea.Cmd                         { return nil }
-func (e emptyModel) Update(_ tea.Msg) (tea.Model, tea.Cmd) { return e, nil }
-func (_ emptyModel) View() string                          { return "" }
-
-func isTerminal(f fs.File) bool {
-	stat, err := f.Stat()
-	if err != nil {
-		return false
-	}
-	return stat.Mode()&fs.ModeCharDevice != 0
 }
 func main() {
 	text := sampleJSON
