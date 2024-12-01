@@ -58,10 +58,10 @@ func newModel(text string) model {
 }
 func tick() tea.Cmd {
 	return tea.Tick(time.Second, func(t time.Time) tea.Msg {
-		return updateMsg(func(m *model) tea.Cmd {
-			m.num++
-			return tick()
-		})
+		return updateMsg{c: tea.Batch(
+			func() tea.Msg { return tickMsg{} },
+			tick(),
+		)}
 	})
 }
 
@@ -75,9 +75,12 @@ func logScript(code string) tea.Cmd {
 	return tea.Printf("    '%s'", code)
 }
 
-type tabMsg struct{}
-type updateMsg func(*model) tea.Cmd
-type switchMsg struct {
+type (
+	tabMsg  struct{}
+	tickMsg struct{}
+)
+
+type updateMsg struct {
 	m tea.Model
 	c tea.Cmd
 }
@@ -110,24 +113,28 @@ const Margin = 8
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case updateMsg:
+		if msg.m == nil {
+			msg.m = m
+		}
+		return msg.m, msg.c
 	case tea.WindowSizeMsg:
 		width := msg.Width - Margin*2
 		m.textarea.SetWidth(width * 3 / 4)
 		m.viewport.Width = width
 		m.viewport.Height = msg.Height / 2
 		return m, nil
-	case updateMsg:
-		cmd := msg(&m)
-		return m, cmd
-	case switchMsg:
-		return msg.m, msg.c
-	case tabMsg:
-		m.code = "#placeholder"
-		m.compact = !m.compact
 	case tea.MouseMsg:
 		var cmd tea.Cmd
 		m.viewport, cmd = m.viewport.Update(msg)
 		return m, cmd
+
+	case tickMsg:
+		m.num++
+		return m, nil
+	case tabMsg:
+		m.code = "#placeholder"
+		m.compact = !m.compact
 	}
 
 	var cmd tea.Cmd
@@ -193,7 +200,7 @@ func msgFilter(_ tea.Model, msg tea.Msg) tea.Msg {
 	case tea.KeyMsg:
 		switch msg.Type {
 		case tea.KeyEsc, tea.KeyCtrlC, tea.KeyCtrlQ:
-			return switchMsg{
+			return updateMsg{
 				emptyModel{},
 				tea.Quit,
 			}
