@@ -50,10 +50,12 @@ func query(code, input string) (string, error) {
 type model struct {
 	textarea textarea.Model
 	viewport viewport.Model
-	input    string
-	code     string
-	err      error
-	num      int
+
+	input string
+	code  string
+
+	err error
+	num int
 }
 
 func newModel(text string) model {
@@ -64,9 +66,8 @@ func newModel(text string) model {
 		code:     "#placeholder",
 	}
 
-	rt.textarea.SetWidth(60)
 	rt.textarea.SetHeight(3)
-	rt.textarea.Placeholder = "Once upon a time..."
+	rt.textarea.Placeholder = "jq..."
 	rt.textarea.Focus()
 
 	return rt
@@ -103,8 +104,15 @@ func (m model) Init() tea.Cmd {
 	)
 }
 
+const Margin = 8
+
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		width := msg.Width - Margin*2
+		m.textarea.SetWidth(width * 3 / 4)
+		m.viewport.Width = width
+		return m, nil
 	case updateMsg:
 		cmd := msg(&m)
 		return m, cmd
@@ -135,8 +143,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	abortUpdate:
 		return m, cmd
 	}
-
-	//return m, nil
 }
 
 var headerStyle = lipgloss.NewStyle().
@@ -160,18 +166,16 @@ func (m model) View() string {
 	}
 	tock = fmt.Sprint(tock, " #", m.num)
 
-	return lipgloss.JoinVertical(lipgloss.Center,
+	mainView := lipgloss.JoinVertical(lipgloss.Center,
 		headerStyle.Render(tock),
 		strings.Repeat("─", 5),
-
-		lipgloss.JoinHorizontal(lipgloss.Top,
-			"    ",
-			viewport,
-		),
-
+		viewport,
 		strings.Repeat("─", 5),
 		m.textarea.View(),
-	) + "\n" + errorStyle.Render(err)
+	)
+
+	return lipgloss.JoinHorizontal(lipgloss.Center, strings.Repeat(" ", Margin), mainView) +
+		"\n" + errorStyle.Render(err)
 }
 
 func msgFilter(_ tea.Model, msg tea.Msg) tea.Msg {
