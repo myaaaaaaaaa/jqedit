@@ -157,6 +157,8 @@ var headerStyle = lipgloss.NewStyle().
 var errorStyle = lipgloss.NewStyle().
 	Bold(true).
 	Foreground(lipgloss.Color("#880000"))
+var hrStyle = lipgloss.NewStyle().
+	Foreground(lipgloss.Color("#cccccc"))
 
 func (m model) View() string {
 	viewport := m.viewport.View()
@@ -172,11 +174,13 @@ func (m model) View() string {
 	}
 	tock = fmt.Sprint(tock, " #", m.num)
 
+	hr := hrStyle.Render(strings.Repeat("─", 4))
+
 	mainView := lipgloss.JoinVertical(lipgloss.Center,
 		headerStyle.Render(tock),
-		strings.Repeat("─", 5),
+		hr,
 		viewport,
-		strings.Repeat("─", 5),
+		hr,
 		m.textarea.View(),
 	)
 
