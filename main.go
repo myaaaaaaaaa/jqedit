@@ -2,10 +2,12 @@ package main
 
 import (
 	"bytes"
+	"cmp"
 	"fmt"
 	"io"
 	"io/fs"
 	"os"
+	"path"
 	"regexp"
 	"strings"
 	"time"
@@ -44,6 +46,7 @@ func (d data) query() (string, error) {
 }
 
 type (
+	saveMsg struct{}
 	tabMsg  struct{}
 	tickMsg struct{}
 )
@@ -55,6 +58,7 @@ type updateMsg struct {
 type model struct {
 	textarea textarea.Model
 	viewport viewport.Model
+	vcontent string
 
 	d data
 
@@ -65,7 +69,7 @@ type model struct {
 func newModel(text string) model {
 	rt := model{
 		textarea: textarea.New(),
-		viewport: viewport.New(80, 15),
+		viewport: viewport.New(10, 10),
 		d: data{
 			input: text,
 			code:  "#placeholder",
@@ -106,6 +110,16 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.viewport, cmd = m.viewport.Update(msg)
 		return m, cmd
 
+	case saveMsg:
+		outFile := cmp.Or(os.Getenv("XDG_RUNTIME_DIR"), "/tmp")
+		outFile = path.Join(outFile, "jq.out.txt")
+
+		m.err = os.WriteFile(outFile, []byte(m.vcontent), 0666)
+		if m.err == nil {
+			return m, tea.Printf("    saved file://%s", subtleStyle.Render(outFile))
+		}
+
+		return m, nil
 	case tickMsg:
 		m.num++
 		return m, nil
@@ -128,6 +142,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	cmd = tea.Batch(cmd, logScript(m.d.code))
 	m.viewport.SetContent(text)
+	m.vcontent = text
 
 abortUpdate:
 	return m, cmd
@@ -140,8 +155,8 @@ var (
 	errorStyle = lipgloss.NewStyle().
 			Bold(true).
 			Foreground(lipgloss.Color("#880000"))
-	hrStyle = lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#cccccc"))
+	subtleStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#cccccc"))
 )
 
 func (m model) View() string {
@@ -158,8 +173,8 @@ func (m model) View() string {
 	}
 	tock = fmt.Sprint(tock, " #", m.num)
 
-	hr := hrStyle.Render("────")
-	vr := hrStyle.Render("│\n│")
+	hr := subtleStyle.Render("────")
+	vr := subtleStyle.Render("│\n│")
 
 	mainView := lipgloss.JoinVertical(lipgloss.Center,
 		headerStyle.Render(tock),
@@ -233,6 +248,8 @@ func msgFilter(_ tea.Model, msg tea.Msg) tea.Msg {
 				emptyModel{},
 				tea.Quit,
 			}
+		case tea.KeyCtrlS:
+			return saveMsg{}
 		case tea.KeyTab:
 			return tabMsg{}
 		}
