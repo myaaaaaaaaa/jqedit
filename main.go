@@ -158,17 +158,24 @@ func (m model) View() string {
 	}
 	tock = fmt.Sprint(tock, " #", m.num)
 
-	hr := hrStyle.Render(strings.Repeat("─", 4))
+	hr := hrStyle.Render("────")
+	vr := hrStyle.Render("│\n│")
 
 	mainView := lipgloss.JoinVertical(lipgloss.Center,
 		headerStyle.Render(tock),
+
 		hr,
-		viewport,
+		lipgloss.JoinHorizontal(lipgloss.Center,
+			vr,
+			viewport,
+			vr,
+		),
 		hr,
+
 		m.textarea.View(),
 	)
 
-	return lipgloss.JoinHorizontal(lipgloss.Center, strings.Repeat(" ", Margin), mainView) +
+	return lipgloss.JoinHorizontal(lipgloss.Center, strings.Repeat(" ", Margin-1), mainView) +
 		"\n" + errorStyle.Render(err)
 }
 
