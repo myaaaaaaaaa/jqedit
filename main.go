@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/textarea"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
@@ -61,6 +62,11 @@ type (
 type updateMsg struct {
 	m tea.Model
 	c tea.Cmd
+}
+
+func init() {
+	textarea.DefaultKeyMap.WordForward = key.NewBinding(key.WithKeys("ctrl+right"))
+	textarea.DefaultKeyMap.WordBackward = key.NewBinding(key.WithKeys("ctrl+left"))
 }
 
 type model struct {
