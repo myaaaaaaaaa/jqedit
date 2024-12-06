@@ -139,7 +139,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	var text string
 	m.textarea, cmd = m.textarea.Update(msg)
-	m.d.code = fmtScript(m.textarea.Value())
+
+	m.d.code = strings.TrimSpace(m.textarea.Value())
+	if m.d.code == "" {
+		m.d.code = "."
+	}
+
 	if m.d == oldData {
 		goto abortUpdate
 	}
@@ -215,13 +220,6 @@ func (_ emptyModel) View() string                          { return "" }
 
 var spaceRe = regexp.MustCompile(`\S+`)
 
-func fmtScript(code string) string {
-	code = strings.TrimSpace(code)
-	if code == "" {
-		code = "."
-	}
-	return code
-}
 func isTerminal(f fs.File) bool {
 	stat, err := f.Stat()
 	if err != nil {
