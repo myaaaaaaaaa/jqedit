@@ -16,6 +16,7 @@ import (
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/itchyny/gojq"
 	"github.com/myaaaaaaaaa/go-jqx"
 )
 
@@ -207,8 +208,7 @@ func (_ emptyModel) View() string                          { return "" }
 var spaceRe = regexp.MustCompile(`\S+`)
 
 func fmtScript(code string) string {
-	words := spaceRe.FindAllString(code, -1)
-	code = strings.Join(words, " ")
+	code = strings.TrimSpace(code)
 	if code == "" {
 		code = "."
 	}
@@ -233,6 +233,14 @@ func tick() tea.Cmd {
 var logged = map[string]bool{}
 
 func logScript(code string) tea.Cmd {
+	{
+		q, err := gojq.Parse(code)
+		if err != nil {
+			panic(err)
+		}
+		code = q.String()
+	}
+
 	if logged[code] {
 		return nil
 	}
