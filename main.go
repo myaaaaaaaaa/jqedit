@@ -40,9 +40,16 @@ func (d data) query() (string, error) {
 	}
 	err := prog.Main()
 	rt := output.String()
-	if rt == "null\n" {
-		return rt, fmt.Errorf("error: query returned null")
+
+	if err == nil {
+		switch rt {
+		case "null\n":
+			err = fmt.Errorf("error: query returned null")
+		case "":
+			err = fmt.Errorf("error: query returned empty")
+		}
 	}
+
 	return rt, err
 }
 
@@ -74,7 +81,8 @@ func newModel(text string) model {
 		d: data{
 			input: text,
 			code:  "#placeholder",
-		}}
+		},
+	}
 
 	rt.textarea.SetHeight(3)
 	rt.textarea.Placeholder = "jq..."
