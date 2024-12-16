@@ -7,7 +7,7 @@ require (
 	github.com/charmbracelet/bubbletea v1.2.4
 	github.com/charmbracelet/lipgloss v1.0.0
 	github.com/itchyny/gojq v0.12.17
-	github.com/myaaaaaaaaa/go-jqx v0.0.0-20241206021027-5fbd1314a5c0
+	github.com/myaaaaaaaaa/go-jqx v0.0.0-20241216202322-6bf919c5df87
 )
 
 require (
