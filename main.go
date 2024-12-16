@@ -39,7 +39,16 @@ func (d data) query() (string, error) {
 
 		StdoutIsTerminal: !d.compact,
 	}
-	err := prog.Main()
+	var err error
+	func() {
+		defer func() {
+			r := recover()
+			if r != nil {
+				err = fmt.Errorf("query panic: %v", r)
+			}
+		}()
+		err = prog.Main()
+	}()
 	rt := output.String()
 
 	if err == nil {
