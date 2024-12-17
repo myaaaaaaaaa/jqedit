@@ -33,9 +33,9 @@ func (d data) query() (string, error) {
 	var output bytes.Buffer
 
 	prog := jqx.Program{
-		Args:   []string{" " + d.code},
-		Stdin:  bytes.NewBufferString(d.input),
-		Stdout: &output,
+		Args:    []string{" " + d.code},
+		Stdin:   bytes.NewBufferString(d.input),
+		Println: func(s string) { fmt.Fprintln(&output, s) },
 
 		StdoutIsTerminal: !d.compact,
 	}
