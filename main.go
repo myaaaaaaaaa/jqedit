@@ -8,7 +8,7 @@ import (
 	"io/fs"
 	"os"
 	"path"
-	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -136,7 +136,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case saveMsg:
 		outFile := cmp.Or(os.Getenv("XDG_RUNTIME_DIR"), "/tmp")
-		outFile = path.Join(outFile, "jq.out.txt")
+		outFile = path.Join(outFile, fmt.Sprintf("jq-%d.txt", uptime()))
 
 		m.err = os.WriteFile(outFile, []byte(m.vcontent), 0666)
 		if m.err == nil {
@@ -233,7 +233,22 @@ func (_ emptyModel) View() string                          { return "" }
 // Helpers
 ////////////////////////////////////////////////////////////////////////////////
 
-var spaceRe = regexp.MustCompile(`\S+`)
+func uptime() (rt int) {
+	rt = int(time.Now().Unix())
+
+	data, err := os.ReadFile("/proc/uptime")
+	if err != nil {
+		return
+	}
+
+	data, _, _ = bytes.Cut(data, []byte(" "))
+	f, err := strconv.ParseFloat(string(data), 64)
+	if err != nil {
+		return
+	}
+
+	return int(f)
+}
 
 func isTerminal(f fs.File) bool {
 	stat, err := f.Stat()
