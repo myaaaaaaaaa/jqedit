@@ -266,7 +266,7 @@ func logScript(code string) tea.Cmd {
 		return nil
 	}
 	logged[code] = true
-	return tea.Printf("    '%s'", code)
+	return tea.Printf("    '%s'", strings.ReplaceAll(code, `'`, `'\''`))
 }
 func msgFilter(_ tea.Model, msg tea.Msg) tea.Msg {
 	switch msg := msg.(type) {
